@@ -114,7 +114,7 @@ if st.session_state.book_text:
         else:
             st.write("🎉 End of book")
 
-    progress = min(100, (st.session_state.current_pos / len(st.session_state.book_text)) * 100
+    progress = min(100, (st.session_state.current_pos / len(st.session_state.book_text)) * 100)
     st.progress(int(progress))
 
 st.markdown("---")
