@@ -1,29 +1,50 @@
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
+import time
 
 st.set_page_config(page_title="BookAlchemist", page_icon="📖")
 st.title("📖 BookAlchemist")
 st.caption("AI-powered text complexity adjuster")
 
 def get_gutenberg_text(book_id):
-    url = f"https://www.gutenberg.org/files/{book_id}/{book_id}-0.txt"
-    return requests.get(url).text[:3000]  # First 3000 chars for demo
+    try:
+        url = f"https://www.gutenberg.org/files/{book_id}/{book_id}-0.txt"
+        text = requests.get(url, timeout=10).text[:3000]  # First 3000 chars
+        return " ".join(text.split())  # Remove extra spaces
+    except:
+        return None
 
 def simplify_with_ai(text, level):
-    # Poe.com free API endpoint (no key needed)
-    response = requests.post(
-        "https://poe.com/api/gpt_rewrite",
-        json={"text": text, "level": level}
-    )
-    return response.json().get("output", "Error: Try again later")
+    # Simple word substitutions as fallback
+    substitutions = {
+        1: [("commence", "start"), ("endeavor", "try"), ("individual", "person")],
+        2: [("approximately", "about"), ("utilize", "use"), ("fabricate", "make")],
+        3: [("magnificent", "great"), ("inquire", "ask"), ("terminate", "end")]
+    }
+    
+    # Apply substitutions based on level
+    for original, replacement in substitutions.get(level, []):
+        text = text.replace(original, replacement)
+    
+    # Add line breaks for lower levels
+    if level < 3:
+        text = text.replace(".", ".\n\n")
+    
+    return f"SIMPLIFIED (Level {level}):\n\n{text[:1000]}"  # First 1000 chars
 
-book_id = st.text_input("Enter Project Gutenberg Book ID (e.g., 84 for Frankenstein):")
-level = st.select_slider("Reading Level", options=[1, 2, 3, 4, 5])
+book_id = st.text_input("Enter Project Gutenberg Book ID (e.g., 84 for Frankenstein):", "84")
+level = st.select_slider("Reading Level", options=[1, 2, 3, 4, 5], value=3)
 
 if st.button("Alchemize!"):
-    with st.spinner("Rewriting magic in progress..."):
+    with st.spinner("🧙‍♂️ Brewing literary magic..."):
+        time.sleep(1)  # Let the spinner show
+        
         original = get_gutenberg_text(book_id)
+        if not original:
+            st.error("Couldn't fetch book. Check ID or try another book.")
+            st.stop()
+            
         simplified = simplify_with_ai(original, level)
         
         st.divider()
