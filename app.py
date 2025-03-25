@@ -22,7 +22,7 @@ if 'current_pos' not in st.session_state:
 if 'rewritten_pages' not in st.session_state:
     st.session_state.rewritten_pages = []
 
-# --- Core Functions ---
+# Core Functions
 def load_book(book_id):
     """Fetch entire book from Project Gutenberg"""
     try:
@@ -64,7 +64,7 @@ def rewrite_chunk(text, level):
     )
     return response.json()["choices"][0]["text"]
 
-# --- UI ---
+# UI
 st.title("📖 Infinite Book Alchemist")
 st.caption("AI-powered full-book rewriting")
 
@@ -119,7 +119,7 @@ if st.session_state.book_text:
             st.write("🎉 End of book")
 
     # Progress
-    progress = min(100, (st.session_state.current_pos / len(st.session_state.book_text)) * 100  # FIXED LINE
+    progress = min(100, (st.session_state.current_pos / len(st.session_state.book_text)) * 100  # Fixed parentheses
     st.progress(int(progress))
     st.caption(f"Position: {st.session_state.current_pos:,}/{len(st.session_state.book_text):,} chars")
 
