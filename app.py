@@ -119,7 +119,7 @@ if st.session_state.book_text:
             st.write("🎉 End of book")
 
     # Progress
-    progress = min(100, (st.session_state.current_pos / len(st.session_state.book_text)) * 100
+    progress = min(100, (st.session_state.current_pos / len(st.session_state.book_text)) * 100  # FIXED LINE
     st.progress(int(progress))
     st.caption(f"Position: {st.session_state.current_pos:,}/{len(st.session_state.book_text):,} chars")
 
