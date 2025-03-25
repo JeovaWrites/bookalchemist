@@ -12,7 +12,7 @@ st.set_page_config(
 
 # --- Constants ---
 MISTRAL_API = "https://api.fireworks.ai/inference/v1/completions"
-MAX_TEXT_LENGTH = 2000  # Characters to process
+MAX_TEXT_LENGTH = 20000  # Characters to process
 
 # --- UI ---
 st.title("✨ BookAlchemist Pro")
