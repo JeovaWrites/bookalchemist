@@ -22,7 +22,6 @@ if 'current_pos' not in st.session_state:
 if 'rewritten_pages' not in st.session_state:
     st.session_state.rewritten_pages = []
 
-# Core Functions
 def load_book(book_id):
     """Fetch entire book from Project Gutenberg"""
     try:
@@ -119,7 +118,7 @@ if st.session_state.book_text:
             st.write("🎉 End of book")
 
     # Progress
-    progress = min(100, (st.session_state.current_pos / len(st.session_state.book_text)) * 100  # Fixed parentheses
+    progress = min(100, (st.session_state.current_pos / len(st.session_state.book_text)) * 100)  # CORRECTED LINE
     st.progress(int(progress))
     st.caption(f"Position: {st.session_state.current_pos:,}/{len(st.session_state.book_text):,} chars")
 
