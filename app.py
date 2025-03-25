@@ -1,169 +1,128 @@
 import streamlit as st
 import requests
-import re
 import time
 
 # Configure app
 st.set_page_config(
-    page_title="BookAlchemist Pro",
-    page_icon="✨",
+    page_title="Infinite Book Alchemist",
+    page_icon="📖",
     layout="centered"
 )
 
-# --- Constants ---
-MISTRAL_API = "https://api.fireworks.ai/inference/v1/completions"
-MAX_TEXT_LENGTH = 20000  # Characters to process
+# Constants
+AI_API = "https://api.fireworks.ai/inference/v1/completions"
+CHUNK_SIZE = 2000  # Characters per page
+OVERLAP = 200      # For smooth transitions
 
-# --- UI ---
-st.title("✨ BookAlchemist Pro")
-st.caption("AI-powered text complexity adjustment")
-
-with st.expander("ℹ️ How to use"):
-    st.markdown("""
-    1. Enter a Project Gutenberg book ID (e.g., `84` for Frankenstein)
-    2. Choose reading level (1 = Simplest, 5 = Original)
-    3. Click **Alchemize!**
-    Find more books at [gutenberg.org](https://www.gutenberg.org)
-    """)
+# Initialize session state
+if 'book_text' not in st.session_state:
+    st.session_state.book_text = ""
+if 'current_pos' not in st.session_state:
+    st.session_state.current_pos = 0
+if 'rewritten_pages' not in st.session_state:
+    st.session_state.rewritten_pages = []
 
 # --- Core Functions ---
-def clean_gutenberg_text(text):
-    """Remove Gutenberg headers/footers and formatting"""
-    # Remove metadata headers
-    start_patterns = [
-        r"\*\*\*.*?START OF.*?\*\*\*",
-        r"CHAPTER [1IVX]+",
-        r"BOOK [1IVX]+"
-    ]
-    for pattern in start_patterns:
-        text = re.split(pattern, text, flags=re.IGNORECASE)[-1]
-    
-    # Remove footers/illustrations
-    text = re.sub(r"\[Illustration:.*?\]", "", text)
-    text = re.sub(r"_{2,}.*?_{2,}", "", text)
-    text = re.sub(r"\n{3,}", "\n\n", text)  # Reduce excessive newlines
-    return text.strip()
-
-def try_ai_enhancement(text, level):
-    """Use Mistral 7B AI for high-quality rewriting"""
-    try:
-        prompt = f"""Rewrite this text for a {level}/5 reading level:
-        - Level 1: Elementary school (short sentences, simple words)
-        - Level 3: High school (clear but detailed)
-        - Level 5: Original text (no changes)\n\n{text[:MAX_TEXT_LENGTH]}"""
-
-        response = requests.post(
-            MISTRAL_API,
-            json={
-                "model": "accounts/fireworks/models/mistral-7b",
-                "prompt": prompt,
-                "max_tokens": 1000,
-                "temperature": 0.4 + (level * 0.1)  # More creative for higher levels
-            },
-            headers={
-                "Authorization": "Bearer free-trial",
-                "Accept": "application/json"
-            },
-            timeout=20
-        )
-        return response.json()["choices"][0]["text"]
-    except Exception as e:
-        print(f"AI Error: {str(e)}")
-        return None
-
-def simplify_with_rules(text, level):
-    """Rule-based fallback system"""
-    substitutions = {
-        1: [("commenced", "started"), ("endeavoured", "tried"), 
-            ("exclaimed", "said"), ("approximately", "about")],
-        2: [("individual", "person"), ("fabricate", "make"), 
-            ("magnificent", "great"), ("inquire", "ask")],
-        3: [("consequently", "so"), ("terminate", "end"), 
-            ("utilize", "use"), ("ascertain", "find out")]
-    }
-    
-    # Apply substitutions
-    for original, replacement in substitutions.get(level, []):
-        text = text.replace(original, replacement)
-    
-    # Adjust sentence length
-    if level < 3:
-        sentences = re.split(r'(?<=[.!?]) +', text)
-        text = ". ".join([s.capitalize() for s in sentences if len(s.split()) <= 12])
-    
-    return text
-
-def get_book_content(book_id):
-    """Fetch and clean text from Project Gutenberg"""
+def load_book(book_id):
+    """Fetch entire book from Project Gutenberg"""
     try:
         url = f"https://www.gutenberg.org/files/{book_id}/{book_id}-0.txt"
-        response = requests.get(url, timeout=15)
+        response = requests.get(url, timeout=30)
         response.raise_for_status()
-        return clean_gutenberg_text(response.text[:MAX_TEXT_LENGTH])
+        
+        # Remove metadata headers
+        text = response.text
+        start_markers = ["*** START OF", "CHAPTER 1", "BOOK FIRST"]
+        for marker in start_markers:
+            if marker in text:
+                text = text.split(marker)[-1]
+        return text
     except Exception as e:
-        st.error(f"Error fetching book: {str(e)}")
+        st.error(f"Error loading book: {str(e)}")
         return None
 
-# --- Main UI ---
+def rewrite_chunk(text, level):
+    """AI rewriting with context awareness"""
+    prompt = f"""Rewrite this book section for a {level}/5 reading level:
+    - Level 1: Simple words, short sentences
+    - Level 3: Clear but detailed
+    - Level 5: Original complexity\n\n{text}"""
+    
+    response = requests.post(
+        AI_API,
+        json={
+            "model": "accounts/fireworks/models/mistral-7b",
+            "prompt": prompt,
+            "max_tokens": 1000,
+            "temperature": 0.5 + (level * 0.1)
+        },
+        headers={
+            "Authorization": "Bearer free-trial",
+            "Content-Type": "application/json"
+        },
+        timeout=25
+    )
+    return response.json()["choices"][0]["text"]
+
+# --- UI ---
+st.title("📖 Infinite Book Alchemist")
+st.caption("AI-powered full-book rewriting")
+
+# Book selection
 book_id = st.text_input(
     "Enter Project Gutenberg Book ID:", 
-    placeholder="e.g., 84 for Frankenstein, 1342 for Pride & Prejudice",
+    placeholder="e.g., 84=Frankenstein, 1342=Pride & Prejudice",
     value="84"
 )
 
 level = st.select_slider(
     "Reading Level",
     options=[1, 2, 3, 4, 5],
-    value=3,
-    help="1 = Simplest (Grade School), 5 = Original Text"
+    value=3
 )
 
-if st.button("✨ Alchemize!", type="primary"):
-    if not book_id.isdigit():
-        st.error("Please enter a valid numeric book ID")
-        st.stop()
+if st.button("🔮 Load Book"):
+    with st.spinner("Downloading book..."):
+        st.session_state.book_text = load_book(book_id)
+        st.session_state.current_pos = 0
+        st.session_state.rewritten_pages = []
+        st.rerun()
+
+# Main reading interface
+if st.session_state.book_text:
+    # Get current chunk with overlap
+    start_pos = max(0, st.session_state.current_pos - OVERLAP)
+    end_pos = st.session_state.current_pos + CHUNK_SIZE
+    current_chunk = st.session_state.book_text[start_pos:end_pos]
     
-    with st.spinner("🔮 Brewing literary magic..."):
-        start_time = time.time()
-        
-        # Step 1: Fetch book content
-        original_text = get_book_content(book_id)
-        if not original_text:
-            st.stop()
-        
-        # Step 2: Try AI enhancement first
-        ai_result = try_ai_enhancement(original_text, level)
-        
-        # Step 3: Fallback if AI fails
-        if ai_result:
-            result = f"🧠 AI-Enhanced (Level {level}):\n\n{ai_result}"
-            method = "AI"
+    # Rewrite if not already cached
+    if len(st.session_state.rewritten_pages) <= st.session_state.current_pos // CHUNK_SIZE:
+        with st.spinner(f"Rewriting page {len(st.session_state.rewritten_pages)+1}..."):
+            rewritten = rewrite_chunk(current_chunk, level)
+            st.session_state.rewritten_pages.append(rewritten)
+    
+    # Display current page
+    st.write(st.session_state.rewritten_pages[-1])
+    
+    # Navigation
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.session_state.current_pos > 0 and st.button("⬅️ Previous Page"):
+            st.session_state.current_pos = max(0, st.session_state.current_pos - CHUNK_SIZE)
+            st.rerun()
+    with col2:
+        if st.session_state.current_pos + CHUNK_SIZE < len(st.session_state.book_text):
+            if st.button("➡️ Next Page"):
+                st.session_state.current_pos += CHUNK_SIZE
+                st.rerun()
         else:
-            result = f"📖 Simplified (Level {level}):\n\n{simplify_with_rules(original_text, level)}"
-            method = "Rule-Based"
-        
-        # Display results
-        st.divider()
-        st.subheader("Original Preview")
-        st.text(original_text[:500] + "...")
-        
-        st.subheader("Result")
-        st.write(result)
-        
-        st.caption(f"Processed with {method} in {time.time()-start_time:.1f}s")
-        
-        # Download button
-        st.download_button(
-            "📥 Download Result",
-            result,
-            file_name=f"book_level_{level}.txt"
-        )
+            st.write("🎉 End of book")
+
+    # Progress
+    progress = min(100, (st.session_state.current_pos / len(st.session_state.book_text)) * 100
+    st.progress(int(progress))
+    st.caption(f"Position: {st.session_state.current_pos:,}/{len(st.session_state.book_text):,} chars")
 
 # Footer
 st.markdown("---")
-st.markdown("""
-<style>
-footer {visibility: hidden;}
-.st-emotion-cache-cio0dv {padding: 1rem;}
-</style>
-""", unsafe_allow_html=True)
+st.caption("Find more books at [Project Gutenberg](https://www.gutenberg.org)")
