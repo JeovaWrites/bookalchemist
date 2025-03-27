@@ -5,7 +5,8 @@ from flask import Flask, request, jsonify
 app = Flask(__name__)
 
 # Set your OpenAI API key
-openai.api_key = "YOUR_OPENAI_API_KEY"
+openai.api_key = "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
+"
 
 # Function to fetch book from Project Gutenberg
 def fetch_book(book_id):
